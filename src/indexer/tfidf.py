@@ -154,15 +154,15 @@ def _cli():
 
     sub = parser.add_subparsers(dest="cmd")
 
-    t = sub.add_parser("train")
-    t.add_argument("--db", type=Path, default=DB_PATH)
-    t.add_argument("--model", type=Path, default=MODEL_PATH)
+    t = sub.add_parser("train", help="Train TF-IDF + classifier to infer environments from text")
+    t.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database with labeled examples for training")
+    t.add_argument("--model", type=Path, default=MODEL_PATH, help="Path to write the trained model (joblib)")
 
-    i = sub.add_parser("infer")
-    i.add_argument("--db", type=Path, default=DB_PATH)
-    i.add_argument("--model", type=Path, default=MODEL_PATH)
-    i.add_argument("--no-update", dest="update", action="store_false", help="Do not write predictions back to DB")
-    i.add_argument("--output", type=Path, required=False, help="Path to write JSON array of inference results")
+    i = sub.add_parser("infer", help="Run inference to predict missing environments using a trained model")
+    i.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read/write inferred labels")
+    i.add_argument("--model", type=Path, default=MODEL_PATH, help="Path to the trained model file (joblib)")
+    i.add_argument("--no-update", dest="update", action="store_false", help="Do not write predictions back to the database")
+    i.add_argument("--output", type=Path, required=False, help="Path to write JSON array of inference results (optional)")
 
     args = parser.parse_args()
     if args.cmd == "train":

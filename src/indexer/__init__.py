@@ -44,19 +44,20 @@ def main() -> None:
 
     sub = parser.add_subparsers(dest="cmd")
 
-    ingest = sub.add_parser("ingest")
-    ingest.add_argument("--db", type=Path, default=DB_PATH)
+    ingest = sub.add_parser("ingest", help="Download and store adventures into a sqlite database")
+    ingest.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to write (will be overwritten if exists)")
 
-    infer = sub.add_parser("infer")
-    infer.add_argument("--db", type=Path, default=DB_PATH)
-    infer.add_argument("--model", type=Path, default=MODEL_PATH)
+    infer = sub.add_parser("infer", help="Train or run the TF-IDF inference model to infer missing labels")
+    infer.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read/write inferred labels")
+    infer.add_argument("--model", type=Path, default=MODEL_PATH, help="Path to save/load the trained inference model")
 
-    index = sub.add_parser("index")
-    index.add_argument("--on", nargs="+", default=["environments", "start_level", "end_level", "downloaded_from"])
-    index.add_argument("--db", type=Path, default=DB_PATH)
-    index.add_argument("--dir", type=Path, default=INDEX_DIR)
+    index = sub.add_parser("index", help="Generate Markdown index files from the database")
+    index.add_argument("--on", nargs="+", default=["environments", "start_level", "end_level", "downloaded_from"],
+                       help="List of attributes to create indexes on (e.g. environments start_level)")
+    index.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read adventures from")
+    index.add_argument("--dir", type=Path, default=INDEX_DIR, help="Directory to write generated index files into")
     index.add_argument("--max-entries", type=int, default=50,
-                       help="Maximum entries per generated index file (default: 50)")
+                       help="Maximum entries per generated index file (default: 50). Set <=0 to disable splitting.")
 
     args = parser.parse_args()
     if args.cmd == "ingest":
@@ -71,15 +72,15 @@ def main() -> None:
 
 def ingest_cli() -> None:
     parser = argparse.ArgumentParser(prog="ingest")
-    parser.add_argument("--db", type=Path, default=DB_PATH)
+    parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to write (will be overwritten if exists)")
     args = parser.parse_args()
     ingest_adventures(args.db)
 
 
 def infer_cli() -> None:
     parser = argparse.ArgumentParser(prog="infer")
-    parser.add_argument("--db", type=Path, default=DB_PATH)
-    parser.add_argument("--model", type=Path, default=MODEL_PATH)
+    parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read/write inferred labels")
+    parser.add_argument("--model", type=Path, default=MODEL_PATH, help="Path to save/load the trained inference model")
     args = parser.parse_args()
     infer_labels(args.db, args.model)
 
@@ -87,10 +88,10 @@ def infer_cli() -> None:
 def index_cli() -> None:
     parser = argparse.ArgumentParser(prog="index")
     parser.add_argument("--on", nargs="+", default=["environments", "start_level", "end_level", "downloaded_from"])
-    parser.add_argument("--db", type=Path, default=DB_PATH)
-    parser.add_argument("--dir", type=Path, default=INDEX_DIR)
+    parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read adventures from")
+    parser.add_argument("--dir", type=Path, default=INDEX_DIR, help="Directory to write generated index files into")
     parser.add_argument("--max-entries", type=int, default=50,
-                        help="Maximum entries per generated index file (default: 50)")
+                        help="Maximum entries per generated index file (default: 50). Set <=0 to disable splitting.")
     args = parser.parse_args()
     index_adventures(args.on, args.db, args.dir, max_entries=args.max_entries)
 
