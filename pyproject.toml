@@ -1,6 +1,7 @@
 [project]
 name = "indexer"
 readme = "README.md"
+version = "1.0.0"
 authors = [
     { name = "aaqil-a", email = "muhammadaaqila@gmail.com" }
 ]
