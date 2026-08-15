@@ -83,7 +83,7 @@ def infer_cli() -> None:
 
 def index_cli() -> None:
     parser = argparse.ArgumentParser(prog="index")
-    parser.add_argument("--on", nargs="+", default=["environments", "start_level"])
+    parser.add_argument("--on", nargs="+", default=["environments", "start_level", "end_level", "downloaded_from"])
     parser.add_argument("--db", type=Path, default=DB_PATH)
     parser.add_argument("--dir", type=Path, default=INDEX_DIR)
     args = parser.parse_args()
