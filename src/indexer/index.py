@@ -14,6 +14,7 @@ def create_adventure_files(
     adventures: List[Adventure],
     indices: List[str],
     root: Path,
+    max_entries: int = 50,
 ) -> None:
     adventure_dir = root / "adventures"
     adventure_dir.mkdir(parents=True, exist_ok=True)
@@ -38,6 +39,7 @@ def create_adventure_files(
             root,
             index,
             lambda a: getattr(a, index),
+            max_entries=max_entries,
         )
 
     if indices:
@@ -105,6 +107,7 @@ def create_indexes(
     root: Path,
     directory_name: str,
     group_by,
+    max_entries: int = 50,
 ) -> Set[Path]:
     adventure_dir = root / "adventures"
 
@@ -132,45 +135,63 @@ def create_indexes(
         groups.items(),
         desc=f"Creating indices for {directory_name}",
     ):
-        index_path = index_dir / f"{safe_index_name(group)}.md"
+        safe_name = safe_index_name(group)
 
-        lines = [
-            f"# {group}",
-            "",
-            "| Adventure | Start Level | End Level | Environments |",
-            "|---|---:|---:|---|",
-        ]
-
-        for adventure in sorted(
+        sorted_adventures = sorted(
             group_adventures,
             key=lambda a: (
                 a.start_level is None,
                 a.start_level or 0,
                 a.title.lower(),
             ),
-        ):
-            adventure_path = (
-                Path("..")
-                / adventure_dir.name
-                / f"{adventure.slug}.md"
-            )
-
-            start_level = adventure.start_level or "—"
-            end_level = adventure.end_level or "—"
-
-            lines.append(
-                f"| [{adventure.title}]({adventure_path.as_posix()}) "
-                f"| {start_level} "
-                f"| {end_level} "
-                f"| {', '.join(adventure.environments)} |"
-            )
-
-        index_path.write_text(
-            "\n".join(lines) + "\n",
-            encoding="utf-8",
         )
 
-        index_files.add(index_path)
+        if max_entries is None or max_entries <= 0:
+            chunks = [sorted_adventures]
+        else:
+            chunks = [
+                sorted_adventures[i : i + max_entries]
+                for i in range(0, len(sorted_adventures), max_entries)
+            ]
+
+        for idx, chunk in enumerate(chunks, start=1):
+            suffix = f"-{idx}" if len(chunks) > 1 else ""
+            index_path = index_dir / f"{safe_name}{suffix}.md"
+
+            title = f"{group}"
+            if len(chunks) > 1:
+                title = f"{group} ({idx}/{len(chunks)})"
+
+            lines = [
+                f"# {title}",
+                "",
+                "| Adventure | Start Level | End Level | Environments |",
+                "|---|---:|---:|---|",
+            ]
+
+            for adventure in chunk:
+                adventure_path = (
+                    Path("..")
+                    / adventure_dir.name
+                    / f"{adventure.slug}.md"
+                )
+
+                start_level = adventure.start_level or "—"
+                end_level = adventure.end_level or "—"
+
+                lines.append(
+                    f"| [{adventure.title}]({adventure_path.as_posix()}) "
+                    f"| {start_level} "
+                    f"| {end_level} "
+                    f"| {', '.join(adventure.environments)} |"
+                )
+
+            index_path.write_text(
+                "\n".join(lines) + "\n",
+                encoding="utf-8",
+            )
+
+            index_files.add(index_path)
 
     return index_files
 

@@ -35,9 +35,9 @@ def infer_labels(db_path: Path, model_path: Path):
     infer(db_path, model_path, True)
 
 
-def index_adventures(on: List[str], db_path: Path, dir: Path):
+def index_adventures(on: List[str], db_path: Path, dir: Path, max_entries: int = 50):
     adventures = get_all_adventures(db_path)
-    create_adventure_files(adventures, on, dir)
+    create_adventure_files(adventures, on, dir, max_entries=max_entries)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -52,8 +52,11 @@ def main() -> None:
     infer.add_argument("--model", type=Path, default=MODEL_PATH)
 
     index = sub.add_parser("index")
+    index.add_argument("--on", nargs="+", default=["environments", "start_level", "end_level", "downloaded_from"])
     index.add_argument("--db", type=Path, default=DB_PATH)
     index.add_argument("--dir", type=Path, default=INDEX_DIR)
+    index.add_argument("--max-entries", type=int, default=50,
+                       help="Maximum entries per generated index file (default: 50)")
 
     args = parser.parse_args()
     if args.cmd == "ingest":
@@ -61,7 +64,7 @@ def main() -> None:
     elif args.cmd == "infer":
         infer_labels(args.db, args.model)
     elif args.cmd == "index":
-        index_adventures(args.db, args.dir)
+        index_adventures(args.on, args.db, args.dir, max_entries=args.max_entries)
     else:
         parser.print_help()
 
@@ -86,8 +89,10 @@ def index_cli() -> None:
     parser.add_argument("--on", nargs="+", default=["environments", "start_level", "end_level", "downloaded_from"])
     parser.add_argument("--db", type=Path, default=DB_PATH)
     parser.add_argument("--dir", type=Path, default=INDEX_DIR)
+    parser.add_argument("--max-entries", type=int, default=50,
+                        help="Maximum entries per generated index file (default: 50)")
     args = parser.parse_args()
-    index_adventures(args.on, args.db, args.dir)
+    index_adventures(args.on, args.db, args.dir, max_entries=args.max_entries)
 
 
 def tfidf_cli() -> None:
