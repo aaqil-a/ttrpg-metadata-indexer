@@ -93,16 +93,46 @@ def create_master_index(
             m = re.match(r"^(.*?)(?:-(\d+))?$", f['stem'])
             base = m.group(1) if m else f['stem']
             groups.setdefault(base, []).append(f)
+        def try_int(s: str):
+            try:
+                return int(s)
+            except Exception:
+                return None
 
-        for base in sorted(groups.keys(), key=lambda s: s.lower()):
+        def base_sort_key(s: str):
+            v = try_int(s)
+            if v is not None:
+                return (0, v)
+            return (1, s.lower())
+
+        def member_sort_key(mem: dict):
+            parts = mem['stem'].split('-')
+            key = []
+            for p in parts:
+                iv = try_int(p)
+                key.append(iv if iv is not None else p.lower())
+            return tuple(key)
+
+        for base in sorted(groups.keys(), key=base_sort_key):
             members = groups[base]
             if len(members) > 1:
-                out_lines.append(f"{prefix}- {base.replace('-', ' ')}")
-                for mem in sorted(members, key=lambda x: x['name']):
-                    out_lines.append(f"{prefix}  - [{mem['stem'].replace('-', ' ')}]({mem['rel']})")
+                umbrella_display = base if try_int(base) is not None else base.replace('-', ' ')
+                out_lines.append(f"{prefix}- {umbrella_display}")
+                for mem in sorted(members, key=member_sort_key):
+                    mm = re.match(r"^(.*?)(?:-(\d+))?$", mem['stem'])
+                    suffix = mm.group(2) if mm else None
+                    if try_int(base) is not None and suffix is not None:
+                        display = f"{base} (part {int(suffix)})"
+                    else:
+                        display = mem['stem'].replace('-', ' ')
+                    out_lines.append(f"{prefix}  - [{display}]({mem['rel']})")
             else:
                 mem = members[0]
-                out_lines.append(f"{prefix}- [{mem['stem'].replace('-', ' ')}]({mem['rel']})")
+                if try_int(base) is not None:
+                    display = base
+                else:
+                    display = mem['stem'].replace('-', ' ')
+                out_lines.append(f"{prefix}- [{display}]({mem['rel']})")
 
         for child_name in sorted(node['children'].keys(), key=lambda s: s.lower()):
             render_node(node['children'][child_name], indent, out_lines, child_name)
@@ -178,14 +208,11 @@ def create_indexes(
         mapping: Dict[str, Path] = {}
 
         def dfs(node, dir_parts: List[str]):
-            # assign groups that end at this node
             for g in node['groups']:
-                # apply safe name to directory parts
                 safe_parts = [safe_index_name(p) for p in dir_parts]
                 mapping[g] = Path('/'.join(safe_parts))
 
             for token, child in node['children'].items():
-                # create a directory for this token only if the subtree contains more than one group
                 should_dir = child['count'] > 1
                 next_parts = dir_parts + [token] if should_dir else dir_parts
                 dfs(child, next_parts)
@@ -198,7 +225,6 @@ def create_indexes(
         trie_root = build_trie(group_keys)
         group_dir_map = assign_dirs(trie_root)
     else:
-        # no hierarchical grouping; map every group to top-level (empty path)
         group_dir_map = {g: Path("") for g in group_keys}
 
     for group, group_adventures in tqdm(
