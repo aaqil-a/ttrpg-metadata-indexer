@@ -18,9 +18,8 @@ DESCRIPTION_TYPES = {
 }
 
 class Tools5eDownloader(Downloader):
-    def __init__(self, base_url: str = BASE_URL, max_creatures: int = 15):
+    def __init__(self, base_url: str = BASE_URL):
         self.base_url = base_url
-        self.max_creatures = max_creatures
 
 
     def _get_slug(self, title: str) -> str:
@@ -121,7 +120,7 @@ class Tools5eDownloader(Downloader):
         if not counts:
             return []
 
-        top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:self.max_creatures]
+        top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
         return [name for name, _ in top]
 
 

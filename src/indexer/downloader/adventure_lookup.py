@@ -12,10 +12,9 @@ BASE_URL = "https://www.adventurelookup.com/api"
 SEED = 42
 
 class AdventureLookupDownloader(Downloader):
-    def __init__(self, base_url: str = BASE_URL, seed: int = SEED, max_creatures: int = 10):
+    def __init__(self, base_url: str = BASE_URL, seed: int = SEED):
         self.base_url = base_url
         self.seed = seed
-        self.max_creatures = max_creatures
 
 
     def _fetch_total_and_page_size(self) -> Tuple[int, int]:
@@ -56,7 +55,6 @@ class AdventureLookupDownloader(Downloader):
 
         creatures = data.get("boss_monsters", []) + data.get("common_monsters", [])
         creatures = [creature.lower() for creature in creatures]
-        creatures = creatures[:self.max_creatures]
 
         return Adventure(
             slug=data["slug"],
