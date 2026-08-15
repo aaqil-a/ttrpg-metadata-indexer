@@ -42,7 +42,7 @@ uv run ingest --db /path/to/sqlite/db
 ```
 
 #### 1a. Infer
-Optional step to infer missing labels (currently only an adventure's `environments` field) based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Requires some data to already be ingested.
+Optional step to infer missing labels based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Currently used to infer `environments` for adventures sourced from 5etools.
 ```bash
 uv run infer
 uv run infer --help
