@@ -1,4 +1,5 @@
 import re
+import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Set
@@ -58,49 +59,64 @@ def create_master_index(
 ) -> None:
     lines: List[str] = []
 
+    def build_tree(paths: Set[Path], base_dir: Path):
+        root_node = {'children': {}, 'files': []}
+
+        for p in paths:
+            try:
+                rel_path = p.relative_to(base_dir)
+            except Exception:
+                rel_path = p.relative_to(root)
+
+            parts = list(rel_path.parts)
+            node = root_node
+            for part in parts[:-1]:
+                node = node['children'].setdefault(part, {'children': {}, 'files': []})
+
+            file_name = parts[-1]
+            rel = quote(p.relative_to(root).as_posix())
+            node['files'].append({'path': p, 'name': file_name, 'stem': p.stem, 'rel': rel})
+
+        return root_node
+
+    def render_node(node, indent: int, out_lines: List[str], dir_name: str | None = None):
+        prefix = '  ' * indent
+        if dir_name is not None:
+            display = dir_name.replace('-', ' ')
+            out_lines.append(f"{prefix}- {display}")
+            indent += 1
+            prefix = '  ' * indent
+
+        files = node.get('files', [])
+        groups: Dict[str, List[dict]] = {}
+        for f in files:
+            m = re.match(r"^(.*?)(?:-(\d+))?$", f['stem'])
+            base = m.group(1) if m else f['stem']
+            groups.setdefault(base, []).append(f)
+
+        for base in sorted(groups.keys(), key=lambda s: s.lower()):
+            members = groups[base]
+            if len(members) > 1:
+                out_lines.append(f"{prefix}- {base.replace('-', ' ')}")
+                for mem in sorted(members, key=lambda x: x['name']):
+                    out_lines.append(f"{prefix}  - [{mem['stem'].replace('-', ' ')}]({mem['rel']})")
+            else:
+                mem = members[0]
+                out_lines.append(f"{prefix}- [{mem['stem'].replace('-', ' ')}]({mem['rel']})")
+
+        for child_name in sorted(node['children'].keys(), key=lambda s: s.lower()):
+            render_node(node['children'][child_name], indent, out_lines, child_name)
+
     for index, paths in index_files.items():
         if not paths:
             continue
 
-        stems = [p.stem for p in paths]
-
-        def is_integer_string(s: str) -> bool:
-            return s.lstrip("+-").isdigit()
-
-        numeric_count = sum(1 for s in stems if is_integer_string(s))
-
-        if numeric_count >= (len(stems) / 2):
-            def sort_key(p: Path):
-                s = p.stem
-                if is_integer_string(s):
-                    return (0, int(s))
-                return (1, s.lower())
-
-            sorted_paths = sorted(paths, key=sort_key)
-        else:
-            sorted_paths = sorted(paths, key=lambda p: p.stem.lower())
-
         lines.append(f"## By {index}")
         lines.append("")
 
-        cols = 5
-        lines.append("| " + " | ".join([""] * cols) + " |")
-        lines.append("|" + "|".join(["---"] * cols) + "|")
-
-        row_cells: List[str] = []
-
-        for path in sorted_paths:
-            rel = quote(path.relative_to(root).as_posix())
-            row_cells.append(f"[{path.stem}]({rel})")
-
-            if len(row_cells) == cols:
-                lines.append("| " + " | ".join(row_cells) + " |")
-                row_cells = []
-
-        if row_cells:
-            row_cells += [""] * (cols - len(row_cells))
-            lines.append("| " + " | ".join(row_cells) + " |")
-
+        base_dir = root / index
+        tree = build_tree(paths, base_dir)
+        render_node(tree, 0, lines)
         lines.append("")
 
     body = "\n".join(lines)
@@ -228,17 +244,15 @@ def create_indexes(
             ]
 
             for adventure in chunk:
-                adventure_path = (
-                    Path("..")
-                    / adventure_dir.name
-                    / f"{adventure.slug}.md"
-                )
+                adventure_file = adventure_dir / f"{adventure.slug}.md"
+                rel_path = os.path.relpath(adventure_file, start=target_dir)
+                rel_posix = rel_path.replace(os.path.sep, '/')
 
                 start_level = adventure.start_level or "—"
                 end_level = adventure.end_level or "—"
 
                 lines.append(
-                    f"| [{adventure.title}]({adventure_path.as_posix()}) "
+                    f"| [{adventure.title}]({quote(rel_posix)}) "
                     f"| {start_level} "
                     f"| {end_level} "
                     f"| {', '.join(adventure.environments)} |"
