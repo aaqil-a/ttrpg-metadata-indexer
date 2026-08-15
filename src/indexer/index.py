@@ -34,6 +34,10 @@ def create_adventure_files(
             print(f"Invalid attribute {index} skipped...")
             continue
 
+        if index == "other_args":
+            print(f"Indexing on other_args is not supported.")
+            continue
+
         index_files[index] = create_indexes(
             adventures,
             root,
@@ -129,7 +133,7 @@ def create_indexes(
             if group is None:
                 group = "Other"
 
-            groups[str(group)].append(adventure)
+            groups[str(group).lower()].append(adventure)
 
     for group, group_adventures in tqdm(
         groups.items(),
@@ -224,6 +228,10 @@ def adventure_to_markdown(adv: Adventure) -> str:
     else:
         front.append(f"end_level: {adv.end_level}")
 
+    front.append("creatures:")
+    for c in (adv.creatures or []):
+        front.append(f'  - "{esc(c)}"')
+
     front.append(f'downloaded_from: "{esc(adv.downloaded_from)}"')
     front.append("---")
 
@@ -244,6 +252,8 @@ def adventure_to_markdown(adv: Adventure) -> str:
     body.append(adv.description or "")
     body.append("```")
     body.append("")
+    body.append("## Creatures")
+    body.append("\n".join([f"- {creature}" for creature in adv.creatures]))
     body.append("## Additional Data")
     body.append("```")
     body.append(f"Downloaded from: {adv.downloaded_from}")

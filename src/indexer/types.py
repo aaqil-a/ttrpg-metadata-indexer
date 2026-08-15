@@ -11,5 +11,6 @@ class Adventure:
     environments: List[str]
     start_level: Optional[int]
     end_level: Optional[int]
+    creatures: List[str]
     downloaded_from: str
     other_args: Dict[str, Any]

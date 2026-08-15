@@ -6,16 +6,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from indexer.downloader.base import Downloader
 from indexer.types import Adventure
-import time
 import logging
 
 BASE_URL = "https://www.adventurelookup.com/api"
 SEED = 42
 
 class AdventureLookupDownloader(Downloader):
-    def __init__(self, base_url: str = BASE_URL, seed: int = SEED):
+    def __init__(self, base_url: str = BASE_URL, seed: int = SEED, max_creatures: int = 10):
         self.base_url = base_url
         self.seed = seed
+        self.max_creatures = max_creatures
 
 
     def _fetch_total_and_page_size(self) -> Tuple[int, int]:
@@ -44,6 +44,8 @@ class AdventureLookupDownloader(Downloader):
             "environments",
             "min_starting_level",
             "max_starting_level",
+            "common_monsters",
+            "boss_monsters"
         }
                 
         other_args = {
@@ -51,6 +53,10 @@ class AdventureLookupDownloader(Downloader):
             for key, value in data.items()
             if key not in known_fields
         }
+
+        creatures = data.get("boss_monsters", []) + data.get("common_monsters", [])
+        creatures = [creature.lower() for creature in creatures]
+        creatures = creatures[:self.max_creatures]
 
         return Adventure(
             slug=data["slug"],
@@ -60,6 +66,7 @@ class AdventureLookupDownloader(Downloader):
             environments=data["environments"],
             start_level=data["min_starting_level"],
             end_level=data["max_starting_level"],
+            creatures=creatures,
             downloaded_from="AdventureLookup",
             other_args=other_args,
         )

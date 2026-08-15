@@ -1,7 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List
+from collections import Counter
+import re
 
-import requests
 from tqdm import tqdm
 from indexer.downloader.base import Downloader
 from indexer.types import Adventure
@@ -17,8 +18,9 @@ DESCRIPTION_TYPES = {
 }
 
 class Tools5eDownloader(Downloader):
-    def __init__(self, base_url: str = BASE_URL):
+    def __init__(self, base_url: str = BASE_URL, max_creatures: int = 15):
         self.base_url = base_url
+        self.max_creatures = max_creatures
 
 
     def _get_slug(self, title: str) -> str:
@@ -83,12 +85,51 @@ class Tools5eDownloader(Downloader):
         return "\n\n".join(parts)
 
 
-    def _fetch_description(self, id: str) -> str:
+    def _extract_creatures(self, value: Any) -> List[str]:
+        counts: Counter[str] = Counter()
+
+        pattern = re.compile(r"\{@creature\s+([^}]+)\}", re.IGNORECASE)
+
+        def walk(node: Any) -> None:
+            if isinstance(node, str):
+                for m in pattern.finditer(node):
+                    inner = m.group(1).strip()
+                    name = inner.split("|", 1)[0].strip()
+                    if name:
+                        counts[name.lower()] += 1
+                return
+
+            if isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+                return
+
+            if not isinstance(node, dict):
+                return
+
+            entries = node.get("entries")
+            if entries is not None:
+                walk(entries)
+                return
+
+            for v in node.values():
+                walk(v)
+
+        walk(value)
+
+        if not counts:
+            return []
+
+        top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:self.max_creatures]
+        return [name for name, _ in top]
+
+
+    def _fetch_adventure_data(self, id: str) -> List[Dict[str, Any]]:
         session = self._session()
         r = session.get(self.base_url + f"/adventure/adventure-{id.lower()}.json", timeout=10)
         r.raise_for_status()
-        data = r.json()["data"]
-        return self._extract_description(data, max_chars=1500)
+        return r.json()["data"]
 
 
     def _parse_adventure(self, data: Dict[str, Any]) -> Adventure:
@@ -98,15 +139,20 @@ class Tools5eDownloader(Downloader):
             "storyline": data["storyline"],
         }
 
+        adventure_data = self._fetch_adventure_data(data["id"])
+        description = self._extract_description(adventure_data, max_chars=1500)
+        creatures = self._extract_creatures(adventure_data)
+
         return Adventure(
             slug=self._get_slug(data["name"]),
             title=data["name"],
-            description=self._fetch_description(data["id"]),
+            description=description,
             authors=[data.get("author", "")],
             environments=[],
             start_level=data["level"]["start"],
             end_level=data["level"]["end"],
             downloaded_from="5etools",
+            creatures=creatures,
             other_args=other_args,
         )   
 

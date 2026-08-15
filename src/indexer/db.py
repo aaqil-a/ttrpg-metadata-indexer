@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS adventures (
     environments TEXT,
     start_level INTEGER,
     end_level INTEGER,
+    creatures TEXT,
     downloaded_from TEXT,
     other_args TEXT
 );
@@ -40,17 +41,20 @@ def store_adventures(adventures: List[Adventure], db_path: str) -> None:
     try:
         cur = conn.cursor()
         sql = (
-            "INSERT INTO adventures (slug, title, description, authors, environments, start_level, end_level, downloaded_from, other_args)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO adventures (slug, title, description, authors, environments, start_level, end_level, creatures, downloaded_from, other_args)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             " ON CONFLICT(slug) DO UPDATE SET"
             " title=excluded.title, description=excluded.description, authors=excluded.authors,"
             " environments=excluded.environments, start_level=excluded.start_level,"
-            " end_level=excluded.end_level, downloaded_from=excluded.downloaded_from, other_args=excluded.other_args"
+            " end_level=excluded.end_level, creatures=excluded.creatures,"
+            " downloaded_from=excluded.downloaded_from, other_args=excluded.other_args"
+
         )
 
         for adv in tqdm(adventures, desc="Storing adventures to database"):
             authors_json = json.dumps(adv.authors or [])
             env_json = json.dumps(adv.environments or [])
+            creatures_json = json.dumps(adv.creatures or [])
             other_json = json.dumps(adv.other_args or {})
             cur.execute(
                 sql,
@@ -62,6 +66,7 @@ def store_adventures(adventures: List[Adventure], db_path: str) -> None:
                     env_json,
                     adv.start_level,
                     adv.end_level,
+                    creatures_json,
                     adv.downloaded_from,
                     other_json,
                 ),
@@ -78,7 +83,7 @@ def get_all_adventures(db_path: str) -> List[Adventure]:
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT slug, title, description, authors, environments, start_level, end_level, downloaded_from, other_args FROM adventures"
+            "SELECT slug, title, description, authors, environments, start_level, end_level, creatures, downloaded_from, other_args FROM adventures"
         )
         rows = cur.fetchall()
         result: List[Adventure] = []
@@ -91,11 +96,13 @@ def get_all_adventures(db_path: str) -> List[Adventure]:
                 env_json,
                 start_level,
                 end_level,
+                creatures_json,
                 downloaded_from,
                 other_json,
             ) = r
             authors = json.loads(authors_json) if authors_json else []
             environments = json.loads(env_json) if env_json else []
+            creatures = json.loads(creatures_json) if creatures_json else []
             other_args = json.loads(other_json) if other_json else {}
             result.append(
                 Adventure(
@@ -106,6 +113,7 @@ def get_all_adventures(db_path: str) -> List[Adventure]:
                     environments=environments,
                     start_level=start_level,
                     end_level=end_level,
+                    creatures=creatures,
                     downloaded_from=downloaded_from,
                     other_args=other_args,
                 )
