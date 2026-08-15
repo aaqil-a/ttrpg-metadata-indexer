@@ -89,7 +89,7 @@ def infer_cli() -> None:
 
 def index_cli() -> None:
     parser = argparse.ArgumentParser(prog="index")
-    parser.add_argument("--on", nargs="+", default=["environments"])
+    parser.add_argument("--on", nargs="+", default=["environments", "downloaded_from"])
     parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read adventures from")
     parser.add_argument("--dir", type=Path, default=INDEX_DIR, help="Directory to write generated index files into")
     parser.add_argument("--max-entries", type=int, default=50,
