@@ -175,25 +175,59 @@ def create_indexes(
     return index_files
 
 def adventure_to_markdown(adv: Adventure) -> str:
-    return f"""
-# {adv.title}
-{
-f"""
-| {" | ".join(adv.environments)} |
-| {" | ".join(["---"] * len(adv.environments))} |
-""" 
-if adv.environments else ""
-}
-**Levels {adv.start_level} - {adv.end_level}**   
-_By {", ".join(adv.authors)}_
-```
-{adv.description}
-```
+    def esc(s: str) -> str:
+        if s is None:
+            return ""
+        return s.replace('\\', '\\\\').replace('"', '\\"')
 
-## Additional Data
-```
-Downloaded from: {adv.downloaded_from}
-{"\n".join([f"{key}: {value}" for key, value in adv.other_args.items()])}
-```
-"""
+    front: List[str] = []
+    front.append("---")
+    front.append(f'slug: "{esc(adv.slug)}"')
+    front.append(f'title: "{esc(adv.title)}"')
 
+    front.append("authors:")
+    for a in (adv.authors or []):
+        front.append(f'  - "{esc(a)}"')
+
+    front.append("environments:")
+    for e in (adv.environments or []):
+        front.append(f'  - "{esc(e)}"')
+
+    if adv.start_level is None:
+        front.append("start_level: null")
+    else:
+        front.append(f"start_level: {adv.start_level}")
+
+    if adv.end_level is None:
+        front.append("end_level: null")
+    else:
+        front.append(f"end_level: {adv.end_level}")
+
+    front.append(f'downloaded_from: "{esc(adv.downloaded_from)}"')
+    front.append("---")
+
+    body: List[str] = []
+    body.append(f"# {adv.title}")
+
+    if adv.environments:
+        body.append("")
+        body.append("| " + " | ".join(adv.environments) + " |")
+        body.append("| " + " | ".join(["---"] * len(adv.environments)) + " |")
+
+    body.append("")
+    start_disp = adv.start_level if adv.start_level is not None else "—"
+    end_disp = adv.end_level if adv.end_level is not None else "—"
+    body.append(f"**Levels {start_disp} - {end_disp}**   ")
+    body.append(f"_By {', '.join(adv.authors or [])}_")
+    body.append("```")
+    body.append(adv.description or "")
+    body.append("```")
+    body.append("")
+    body.append("## Additional Data")
+    body.append("```")
+    body.append(f"Downloaded from: {adv.downloaded_from}")
+    for key, value in (adv.other_args or {}).items():
+        body.append(f"{key}: {value}")
+    body.append("```")
+
+    return "\n".join(front + [""] + body) + "\n"
