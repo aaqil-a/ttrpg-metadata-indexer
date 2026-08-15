@@ -35,9 +35,9 @@ def infer_labels(db_path: Path, model_path: Path):
     infer(db_path, model_path, True)
 
 
-def index_adventures(on: List[str], db_path: Path, dir: Path, max_entries: int = 50):
+def index_adventures(on: List[str], db_path: Path, dir: Path, max_entries: int = 50, hierarchical: bool = False):
     adventures = get_all_adventures(db_path)
-    create_adventure_files(adventures, on, dir, max_entries=max_entries)
+    create_adventure_files(adventures, on, dir, max_entries=max_entries, hierarchical=hierarchical)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -58,6 +58,8 @@ def main() -> None:
     index.add_argument("--dir", type=Path, default=INDEX_DIR, help="Directory to write generated index files into")
     index.add_argument("--max-entries", type=int, default=50,
                        help="Maximum entries per generated index file (default: 50). Set <=0 to disable splitting.")
+    index.add_argument("--no-hierarchical", dest="hierarchical", action="store_false",
+                       help="Disable hierarchical directory grouping for index files (default: enabled)")
 
     args = parser.parse_args()
     if args.cmd == "ingest":
@@ -65,7 +67,7 @@ def main() -> None:
     elif args.cmd == "infer":
         infer_labels(args.db, args.model)
     elif args.cmd == "index":
-        index_adventures(args.on, args.db, args.dir, max_entries=args.max_entries)
+        index_adventures(args.on, args.db, args.dir, max_entries=args.max_entries, hierarchical=bool(getattr(args, 'hierarchical', True)))
     else:
         parser.print_help()
 
@@ -92,8 +94,10 @@ def index_cli() -> None:
     parser.add_argument("--dir", type=Path, default=INDEX_DIR, help="Directory to write generated index files into")
     parser.add_argument("--max-entries", type=int, default=50,
                         help="Maximum entries per generated index file (default: 50). Set <=0 to disable splitting.")
+    parser.add_argument("--no-hierarchical", dest="hierarchical", action="store_false",
+                        help="Disable hierarchical directory grouping for index files (default: enabled)")
     args = parser.parse_args()
-    index_adventures(args.on, args.db, args.dir, max_entries=args.max_entries)
+    index_adventures(args.on, args.db, args.dir, max_entries=args.max_entries, hierarchical=bool(getattr(args, 'hierarchical', True)))
 
 
 def tfidf_cli() -> None:

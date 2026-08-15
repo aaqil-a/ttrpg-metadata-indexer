@@ -15,6 +15,7 @@ def create_adventure_files(
     indices: List[str],
     root: Path,
     max_entries: int = 50,
+    hierarchical: bool = True,
 ) -> None:
     adventure_dir = root / "adventures"
     adventure_dir.mkdir(parents=True, exist_ok=True)
@@ -44,6 +45,7 @@ def create_adventure_files(
             index,
             lambda a: getattr(a, index),
             max_entries=max_entries,
+            hierarchical=hierarchical,
         )
 
     if indices:
@@ -112,6 +114,7 @@ def create_indexes(
     directory_name: str,
     group_by,
     max_entries: int = 50,
+    hierarchical: bool = True,
 ) -> Set[Path]:
     adventure_dir = root / "adventures"
 
@@ -134,6 +137,53 @@ def create_indexes(
                 group = "Other"
 
             groups[str(group).lower()].append(adventure)
+
+    def build_trie(keys: List[str]):
+        root = {'children': {}, 'groups': [], 'count': 0}
+
+        for g in keys:
+            tokens = g.split()
+            node = root
+            for t in tokens:
+                node = node['children'].setdefault(t, {'children': {}, 'groups': [], 'count': 0})
+            node['groups'].append(g)
+
+        def compute_counts(node):
+            total = len(node['groups'])
+            for child in node['children'].values():
+                total += compute_counts(child)
+            node['count'] = total
+            return total
+
+        compute_counts(root)
+        return root
+
+    def assign_dirs(root):
+        mapping: Dict[str, Path] = {}
+
+        def dfs(node, dir_parts: List[str]):
+            # assign groups that end at this node
+            for g in node['groups']:
+                # apply safe name to directory parts
+                safe_parts = [safe_index_name(p) for p in dir_parts]
+                mapping[g] = Path('/'.join(safe_parts))
+
+            for token, child in node['children'].items():
+                # create a directory for this token only if the subtree contains more than one group
+                should_dir = child['count'] > 1
+                next_parts = dir_parts + [token] if should_dir else dir_parts
+                dfs(child, next_parts)
+
+        dfs(root, [])
+        return mapping
+
+    group_keys = list(groups.keys())
+    if hierarchical:
+        trie_root = build_trie(group_keys)
+        group_dir_map = assign_dirs(trie_root)
+    else:
+        # no hierarchical grouping; map every group to top-level (empty path)
+        group_dir_map = {g: Path("") for g in group_keys}
 
     for group, group_adventures in tqdm(
         groups.items(),
@@ -160,7 +210,11 @@ def create_indexes(
 
         for idx, chunk in enumerate(chunks, start=1):
             suffix = f"-{idx}" if len(chunks) > 1 else ""
-            index_path = index_dir / f"{safe_name}{suffix}.md"
+            dir_parts = group_dir_map.get(group, Path())
+            target_dir = index_dir / dir_parts
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            index_path = target_dir / f"{safe_name}{suffix}.md"
 
             title = f"{group}"
             if len(chunks) > 1:

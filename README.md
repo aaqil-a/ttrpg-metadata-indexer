@@ -1,7 +1,7 @@
 # TTRPG Adventure Indexer
 Ingest TTRPG adventure metadata from a variety of data sources.
 
-Index them into Markdown files based on metadata fields for knowledge-base-friendly navigation.
+Index them into Markdown files based on metadata fields for easier and knowledge-base-friendly navigation.
 
 ## Output 
 ```bash
@@ -41,19 +41,20 @@ uv run ingest
 uv run ingest --db /path/to/sqlite/db
 ```
 
-### 1a. Infer
-Optional step to infer missing labels (specifically an adventure's `environments` field) based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Requires some data to already be ingested.
+#### 1a. Infer
+Optional step to infer missing labels (currently only an adventure's `environments` field) based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Requires some data to already be ingested.
 ```bash
 uv run infer
-uv run infer --db /path/to/sqlite/db --model /path/to/save/inference/model
+uv run infer --help
 
 # Only train
 uv run tfidf train
-uv run tfidf train --db /path/to/sqlite/db --model /path/to/save/inference/model
+uv run tfidf train --help
 
 # Only infer
 uv run tfidf infer
 uv run tfidf infer --no-update --output /path/to/save/inference/result/json
+uv run tfidf infer --help
 ```
 
 ### 2. Index
@@ -61,5 +62,5 @@ Create index Markdown files based on metadata fields. See [types.py](src/indexer
 ```bash
 uv run index
 uv run index --on environments start_level
-uv run index --db /path/to/sqlite/db --dir /path/to/index/files/directory
+uv run index --help
 ```
