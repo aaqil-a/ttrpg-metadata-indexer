@@ -35,14 +35,14 @@ See [downloaders](src/indexer/downloader) for implementation.
 
 ## Usage
 ### 1. Ingest Data
-Overwrites database file if already exists.
+Ingests adventures from data sources into sqlite database. Overwrites database file if already exists.
 ```bash
 uv run ingest
 uv run ingest --db /path/to/sqlite/db
 ```
 
 ### 1a. Infer
-Optional step to infer missing labels for adventure's `environments` based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Requires some data to already be ingested.
+Optional step to infer missing labels (specifically an adventure's `environments` field) based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Requires some data to already be ingested.
 ```bash
 uv run infer
 uv run infer --db /path/to/sqlite/db --model /path/to/save/inference/model
@@ -57,7 +57,7 @@ uv run tfidf infer --no-update --output /path/to/save/inference/result/json
 ```
 
 ### 2. Index
-Create indices based on metadata fields. See [types.py](src/indexer/types.py) for currently supported fields (to be extended).
+Create index Markdown files based on metadata fields. See [types.py](src/indexer/types.py) for currently supported fields (to be extended).
 ```bash
 uv run index
 uv run index --on environments start_level
