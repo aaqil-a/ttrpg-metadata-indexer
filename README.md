@@ -24,7 +24,7 @@ index/
 ```
 
 ## Data Sources
-See [downloaders](src/repo/downloader) for implementation.
+See [downloaders](src/indexer/downloader) for implementation.
 1. [AdventureLookup](https://www.adventurelookup.com/) using [public API](https://www.adventurelookup.com/api)
 2. [5etools](https://5e.tools/) using data from public [GitHub repository](https://github.com/5etools-mirror-3/5etools-src)
 
@@ -42,7 +42,7 @@ uv run ingest --db /path/to/sqlite/db
 ```
 
 ### 1a. Infer
-Optional step to infer missing labels for adventure's `environments` based on existing data using simple [TFIDF logistic regression](src/repo/tfidf.py). Requires some data to already be ingested.
+Optional step to infer missing labels for adventure's `environments` based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Requires some data to already be ingested.
 ```bash
 uv run infer
 uv run infer --db /path/to/sqlite/db --model /path/to/save/inference/model
