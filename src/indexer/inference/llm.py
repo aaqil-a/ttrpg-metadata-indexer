@@ -15,12 +15,6 @@ from tqdm import tqdm
 from indexer.config import load_inference_config
 from indexer.inference.base import AdventureRecord, BaseClassifier
 
-DEFAULT_BASE_URL = "https://api.openai.com/v1"
-DEFAULT_MODEL = "gpt-4.1-mini"
-DEFAULT_API_KEY_ENV = "OPENAI_API_KEY"
-DEFAULT_MAX_WORKERS = 8
-DEFAULT_TIMEOUT = 30
-
 SYSTEM_PROMPT = (
     "You are a metadata classifier for tabletop RPG adventures. "
     "Given an adventure's title, description and notable creatures, decide which "
@@ -107,7 +101,7 @@ def estimate_tokens(
 ) -> Dict[str, Any]:
     """Estimate token usage for a full LLM inference run without calling the API."""
     config = _load_llm_config(config_path)
-    model = config.get("model", DEFAULT_MODEL)
+    model = config.get("model", "")
     count, method = _make_token_counter(model)
 
     conn = sqlite3.connect(str(db_path))
@@ -168,15 +162,15 @@ def print_token_estimate(db_path: Path, config_path: Optional[Path] = None) -> D
 class LLMClassifier(BaseClassifier):
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         config = config or {}
-        self.base_url = str(config.get("base_url", DEFAULT_BASE_URL)).rstrip("/")
-        self.model = config.get("model", DEFAULT_MODEL)
+        self.base_url = str(config.get("openai_api_url")).rstrip("/")
+        self.model = config.get("model", "")
         self.temperature = config.get("temperature", 0)
         self.max_tokens = config.get("max_tokens", 256)
-        self.timeout = config.get("timeout", DEFAULT_TIMEOUT)
+        self.timeout = config.get("timeout", 30)
         self.json_mode = config.get("json_mode", True)
-        self.max_workers = config.get("max_workers", DEFAULT_MAX_WORKERS)
+        self.max_workers = config.get("max_workers", 1)
         self.extra_params = config.get("extra_params", {})
-        api_key_env = config.get("api_key_env", DEFAULT_API_KEY_ENV)
+        api_key_env = config.get("api_key_env", "")
         self.api_key = os.environ.get(api_key_env, "")
 
     def classify(self, taxonomy: List[str], title: str, description: str, creatures: List[str]) -> List[str]:
@@ -263,7 +257,7 @@ def _cli():
     i.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read/write inferred labels")
     i.add_argument("--config", type=Path, default=CONFIG_PATH, help="Path to the config file (reads the inference.llm section)")
     i.add_argument("--no-update", dest="update", action="store_false", help="Do not write predictions back to the database")
-    i.add_argument("--output", type=Path, required=False, help="Path to write JSON array of inference results (optional)")
+    i.add_argument("--output", type=Path, required=False, help="Path to write inference results JSON (optional)")
 
     e = sub.add_parser("estimate", help="Estimate token usage without calling the API")
     e.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read unlabeled adventures from")

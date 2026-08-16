@@ -83,7 +83,6 @@ class TFIDFClassifier(BaseClassifier):
         self.max_iter = config.get("max_iter", DEFAULT_MAX_ITER)
         self.fallback_threshold = config.get("fallback_threshold", DEFAULT_FALLBACK_THRESHOLD)
 
-        # Model artifacts, populated by train() or load().
         self.vectorizer: Optional[FeatureUnion] = None
         self.clf: Optional[OneVsRestClassifier] = None
         self.mlb: Optional[MultiLabelBinarizer] = None
@@ -113,8 +112,6 @@ class TFIDFClassifier(BaseClassifier):
         return FeatureUnion(transformer_list)
 
     def _make_classifier(self) -> OneVsRestClassifier:
-        # class_weight="balanced" is essential here: labels range from ~1100
-        # (Dungeon) to ~22 (Shadowfell). Without it, rare classes are never predicted.
         return OneVsRestClassifier(
             LogisticRegression(max_iter=self.max_iter, class_weight="balanced")
         )
@@ -135,7 +132,6 @@ class TFIDFClassifier(BaseClassifier):
             if not labeled:
                 raise RuntimeError("No labeled examples found in the database to train on.")
 
-            # Hold out an eval set for honest reporting (optional).
             if eval_split > 0:
                 train_rows, eval_rows = train_test_split(
                     labeled, test_size=eval_split, random_state=42, shuffle=True
@@ -146,8 +142,6 @@ class TFIDFClassifier(BaseClassifier):
             if not train_rows:
                 raise RuntimeError("No training examples remained after the requested data split.")
 
-            # Carve a validation slice out of the training data to tune the
-            # threshold, so the eval set stays untouched by threshold selection.
             if threshold is None and len(train_rows) > 20:
                 fit_rows, val_rows = train_test_split(
                     train_rows, test_size=0.15, random_state=42, shuffle=True
@@ -162,7 +156,6 @@ class TFIDFClassifier(BaseClassifier):
             clf = self._make_classifier()
             clf.fit(X, Y)
 
-            # Decide the threshold.
             if threshold is not None:
                 best_threshold = threshold
             elif val_rows:
@@ -174,7 +167,6 @@ class TFIDFClassifier(BaseClassifier):
             else:
                 best_threshold = self.fallback_threshold
 
-            # Report on the held-out eval set at the chosen threshold.
             metrics: dict = {}
             if eval_rows:
                 X_eval = vectorizer.transform([text for text, _ in eval_rows])
@@ -197,8 +189,6 @@ class TFIDFClassifier(BaseClassifier):
                     )
                 )
 
-            # Fit the shipped model on ALL labeled data (train + eval) so
-            # inference benefits from every example; keep the tuned threshold.
             final_vectorizer = self._make_vectorizer()
             X_all = final_vectorizer.fit_transform([text for text, _ in labeled])
             final_mlb = MultiLabelBinarizer()
@@ -246,7 +236,6 @@ class TFIDFClassifier(BaseClassifier):
     def predict_records(
         self, records: List[AdventureRecord], taxonomy: List[str]
     ) -> List[List[str]]:
-        # taxonomy is unused: the fitted MultiLabelBinarizer already encodes the labels.
         return self.predict([self._build_text(record) for record in records])
 
 
@@ -295,7 +284,7 @@ def _cli():
     i.add_argument("--model", type=Path, default=MODEL_PATH, help="Path to the trained model file (joblib)")
     i.add_argument("--threshold", type=float, default=None, help="Override the model's stored prediction threshold")
     i.add_argument("--no-update", dest="update", action="store_false", help="Do not write predictions back to the database")
-    i.add_argument("--output", type=Path, required=False, help="Path to write JSON array of inference results (optional)")
+    i.add_argument("--output", type=Path, required=False, help="Path to write inference results JSON (optional)")
 
     args = parser.parse_args()
     if args.cmd == "train":

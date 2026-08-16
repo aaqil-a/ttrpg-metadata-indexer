@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+MAX_DESC_LENGTH = 1500
 
 @dataclass
 class Adventure:

@@ -24,9 +24,10 @@ index/
 ```
 
 ## Data Sources
-See [downloaders](src/indexer/downloader) for implementation.
-1. [AdventureLookup](https://www.adventurelookup.com/) using [public API](https://www.adventurelookup.com/api)
-2. [5etools](https://5e.tools/) using data from public [GitHub repository](https://github.com/5etools-mirror-3/5etools-src)
+See [downloaders](src/indexer/downloader) for implementation, and [config](config/config.yaml) for source URLs.
+1. [AdventureLookup](https://www.adventurelookup.com/)
+2. [5etools](https://5e.tools/) 
+3. [Forgotten Realms Wiki](https://forgottenrealms.fandom.com/) 
 
 ## Requirements
 - Python >= 3.14

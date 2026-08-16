@@ -2,11 +2,12 @@ import argparse
 
 from dataclasses import fields
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
-from indexer.db import get_all_adventures, store_adventures
+from indexer.db import get_all_adventures, get_all_slugs, store_adventures
 from indexer.downloader.adventure_lookup import AdventureLookupDownloader
 from indexer.downloader.base import Downloader
+from indexer.downloader.forgotten_realms_wiki import ForgottenRealmsWikiDownloader
 from indexer.downloader.tools5e import Tools5eDownloader
 from indexer.index import create_adventure_files
 import indexer.inference.tfidf as tfidf_module
@@ -23,9 +24,10 @@ CONFIG_PATH = ROOT_PATH / "config" / "config.yaml"
 SOURCE_DOWNLOADER_MAP = {
     "adventurelookup": AdventureLookupDownloader(config_path=CONFIG_PATH),
     "5etools": Tools5eDownloader(config_path=CONFIG_PATH),
+    "forgottenrealmswiki": ForgottenRealmsWikiDownloader(config_path=CONFIG_PATH)
 }
 
-def ingest_adventures(db_path: Path, sources: List[str] = [], overwrite: bool = False):
+def ingest_adventures(db_path: Path, sources: List[str] = [], overwrite: bool = False, reset_cache: bool = False):
     downloaders: List[Downloader] = []
     if sources:
         for source in sources:
@@ -36,14 +38,23 @@ def ingest_adventures(db_path: Path, sources: List[str] = [], overwrite: bool = 
     else:
         downloaders = list(SOURCE_DOWNLOADER_MAP.values())
 
+    existing_slugs = get_all_slugs(db_path)
+
     for downloader in downloaders:
-        adventures = downloader.fetch_adventures()
+        if reset_cache:
+            removed = downloader.reset_cache()
+            print(f"Cleared {removed} cached responses for {downloader.__class__.__name__}.")
+
+        adventures = downloader.fetch_adventures(existing_slugs)
         ingested = store_adventures(adventures, db_path, overwrite)
+
+        for adv in adventures:
+            existing_slugs.add(adv.slug)
 
         print(f"Ingested {ingested} new adventures from {downloader.__class__.__name__} into {db_path}.")
 
 
-def infer_labels(db_path: Path, model_path: Path, skip_training: bool, inferrer: str = "tfidf"):
+def infer_labels(db_path: Path, model_path: Path, skip_training: bool, inferrer: str = "tfidf", output_path: Optional[Path] = None):
     if inferrer == "llm":
         from indexer.inference.llm import infer as llm_infer
         llm_infer(db_path, update_db=True, config_path=CONFIG_PATH)
@@ -52,7 +63,7 @@ def infer_labels(db_path: Path, model_path: Path, skip_training: bool, inferrer:
     if not skip_training:
         train(db_path, model_path)
 
-    infer(db_path, model_path, True)
+    infer(db_path, model_path, True, output_path=output_path)
 
 
 def index_adventures(on: List[str], db_path: Path, dir: Path, max_entries: int = 50, hierarchical: bool = False):
@@ -66,9 +77,11 @@ def ingest_cli() -> None:
         help="Data sources to fetch from, leave empty to use all.")
     parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to write (will be overwritten if exists)")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing entries (default: disabled)")
+    parser.add_argument("--reset-cache", action="store_true",
+        help="Clear the on-disk response cache for the selected sources before fetching (forces fresh API calls this run)")
 
     args = parser.parse_args()
-    ingest_adventures(args.db, args.sources, args.overwrite)
+    ingest_adventures(args.db, args.sources, args.overwrite, args.reset_cache)
 
 
 def infer_cli() -> None:
@@ -76,8 +89,10 @@ def infer_cli() -> None:
     parser.add_argument("--inferrer", choices=["tfidf", "llm"], default="tfidf",
         help="Which inferrer to use (default: tfidf). 'llm' calls an OpenAI-compatible model configured under 'inference' in config.yaml.")
     parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read/write inferred labels")
+    parser.add_argument("--output", type=Path, required=False, help="Path to write inference results JSON (optional)")
     parser.add_argument("--model", type=Path, default=MODEL_PATH, help="Path to save/load the trained inference model (tfidf only)")
     parser.add_argument("--skip-training", action="store_true", help="Skip training, model must already exist at given path (tfidf only)")
+    parser.add_argument("--estimate", action="store_true", help="Estimate token requirement for LLM inference (llm only)")
     args = parser.parse_args()
 
     if args.estimate:
@@ -87,7 +102,7 @@ def infer_cli() -> None:
         print_token_estimate(args.db, CONFIG_PATH)
         return
 
-    infer_labels(args.db, args.model, args.skip_training, args.inferrer)
+    infer_labels(args.db, args.model, args.skip_training, args.inferrer, args.output)
 
 
 def index_cli() -> None:

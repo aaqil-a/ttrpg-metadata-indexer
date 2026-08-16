@@ -1,24 +1,23 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 from collections import Counter
 import re
 
 from tqdm import tqdm
 from indexer.config import load_data_sources
-from indexer.downloader.base import Downloader
-from indexer.types import Adventure
+from indexer.downloader.base import Downloader, JsonDiskCache
+from indexer.types import MAX_DESC_LENGTH, Adventure
 
 
 class Tools5eDownloader(Downloader):
     def __init__(self, config_path: str | Path | None = None):
         config = load_data_sources(config_path)
         source_config = config.get("5etools", {})
-        self.base_url = source_config.get("base_url", "")
+        self.data_path = source_config.get("data_path", "")
         self.description_types = source_config.get("description_types", [])
-
-    def _get_slug(self, title: str) -> str:
-        return title.replace(" ", "-").lower()
+        self.session = self._session()
+        self.cache = JsonDiskCache("build/5etools_cache", expire_after=source_config.get("cache_expiry_seconds", 604800))
 
 
     def _extract_description(self, value: Any, max_chars: int) -> str:
@@ -120,10 +119,8 @@ class Tools5eDownloader(Downloader):
 
 
     def _fetch_adventure_data(self, id: str) -> List[Dict[str, Any]]:
-        session = self._session()
-        r = session.get(self.base_url + f"/adventure/adventure-{id.lower()}.json", timeout=10)
-        r.raise_for_status()
-        return r.json()["data"]
+        url = self.data_path + f"/adventure/adventure-{id.lower()}.json"
+        return self._get_json(self.session, url, cache=self.cache)["data"]
 
 
     def _parse_adventure(self, data: Dict[str, Any]) -> Adventure:
@@ -134,11 +131,11 @@ class Tools5eDownloader(Downloader):
         }
 
         adventure_data = self._fetch_adventure_data(data["id"])
-        description = self._extract_description(adventure_data, max_chars=1500)
+        description = self._extract_description(adventure_data, max_chars=MAX_DESC_LENGTH)
         creatures = self._extract_creatures(adventure_data)
 
         return Adventure(
-            slug=self._get_slug(data["name"]),
+            slug=self.get_slug(data["name"]),
             title=data["name"],
             description=description,
             authors=[data.get("author", "")],
@@ -151,11 +148,8 @@ class Tools5eDownloader(Downloader):
         )   
 
 
-    def fetch_adventures(self, max_workers: int = 20) -> List[Adventure]:
-        session = self._session()
-        r = session.get(self.base_url + "/adventures.json", timeout=10)
-        r.raise_for_status()
-        data = r.json()
+    def fetch_adventures(self, existing_slugs: Set[str] = set(), max_workers: int = 20) -> List[Adventure]:
+        data = self._get_json(self.session, self.data_path + "/adventures.json", cache=self.cache)
         adventures = data["adventure"]
 
         all_adventures = []
@@ -163,7 +157,7 @@ class Tools5eDownloader(Downloader):
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(self._parse_adventure, adv)
-                for adv in adventures
+                for adv in adventures if self.get_slug(adv["name"]) not in existing_slugs
             ]
 
             with tqdm(

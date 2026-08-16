@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 import math
 
@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from tqdm import tqdm
 from indexer.config import load_data_sources
-from indexer.downloader.base import Downloader
+from indexer.downloader.base import Downloader, JsonDiskCache
 from indexer.types import Adventure
 import logging
 
@@ -17,15 +17,17 @@ class AdventureLookupDownloader(Downloader):
     ):
         config = load_data_sources(config_path)
         source_config = config.get("adventurelookup", {})
-        self.base_url = source_config.get("base_url", "")
+        self.api_url = source_config.get("api_url", "")
         self.seed = source_config.get("seed", 0)
+        self.session = self._session()
+        self.cache = JsonDiskCache("build/adventurelookup_cache", expire_after=source_config.get("cache_expiry_seconds", 86400))
 
 
     def _fetch_total_and_page_size(self) -> Tuple[int, int]:
-        session = self._session()
-        r = session.get(f"{self.base_url}/adventures?page=1&seed={self.seed}", timeout=10)
-        r.raise_for_status()
-        body = r.json()
+        body = self._get_json(
+            self.session, f"{self.api_url}/adventures",
+            params={"page": 1, "seed": self.seed}, cache=self.cache,
+        )
 
         total = body.get("total_count", 0)
         if total <= 0:
@@ -75,14 +77,14 @@ class AdventureLookupDownloader(Downloader):
 
 
     def _fetch_page(self, page: int = 1) -> List[Adventure]:
-        session = self._session()
-        r = session.get(f"{self.base_url}/adventures?page={page}&seed={self.seed}", timeout=10)
-        r.raise_for_status()
-        data = r.json()
+        data = self._get_json(
+            self.session, f"{self.api_url}/adventures",
+            params={"page": page, "seed": self.seed}, cache=self.cache,
+        )
         return [self._parse_adventure(adv) for adv in data.get("adventures", [])]
 
 
-    def fetch_adventures(self, max_workers: int = 20) -> List[Adventure]:
+    def fetch_adventures(self, existing_slugs: Set[str] = set(), max_workers: int = 20) -> List[Adventure]:
         total, page_size = self._fetch_total_and_page_size()
         page_num = math.ceil(total / page_size)
         all_adventures = []

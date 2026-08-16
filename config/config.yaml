@@ -1,19 +1,24 @@
 data_sources:
   adventurelookup:
-    base_url: "https://www.adventurelookup.com/api"
+    api_url: "https://www.adventurelookup.com/api"
     seed: 42
+    cache_expiry_seconds: 86400
   5etools:
-    base_url: "https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/refs/heads/main/data"
+    data_path: "https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/refs/heads/main/data"
     description_types:
       - "section"
       - "entries"
       - "inset"
       - "insetReadaloud"
       - "quote"
+    cache_expiry_seconds: 604800
+  forgottenrealmswiki:
+    api_url: "https://forgottenrealms.fandom.com/api.php"
+    cache_expiry_seconds: 604800
 
 inference:
   llm:
-    base_url: "http://localhost:11434/v1"
+    openai_api_url: "http://localhost:11434/v1"
     model: "qwen3:8b"
     temperature: 0
     max_tokens: 256

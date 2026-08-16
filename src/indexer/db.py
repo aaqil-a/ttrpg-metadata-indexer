@@ -1,7 +1,7 @@
 import json
 import sqlite3
 from pathlib import Path
-from typing import List
+from typing import List, Set
 
 from tqdm import tqdm
 
@@ -127,6 +127,24 @@ def get_all_adventures(db_path: Path) -> List[Adventure]:
                     other_args=other_args,
                 )
             )
+        return result
+    finally:
+        conn.close()
+
+
+def get_all_slugs(db_path: Path) -> Set[str]:
+    init_db(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT slug FROM adventures"
+        )
+        rows = cur.fetchall()
+        result: Set[str] = set()
+        for r in rows:
+            (slug) = r
+            result.add(slug)
         return result
     finally:
         conn.close()
