@@ -35,44 +35,53 @@ def init_db(db_path: str) -> None:
         conn.close()
 
 
-def store_adventures(adventures: List[Adventure], db_path: str) -> None:
+def store_adventures(adventures: List[Adventure], db_path: str, overwrite: bool) -> int:
     init_db(db_path)
     conn = sqlite3.connect(db_path)
     try:
         cur = conn.cursor()
+        
         sql = (
             "INSERT INTO adventures (slug, title, description, authors, environments, start_level, end_level, creatures, downloaded_from, other_args)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            " ON CONFLICT(slug) DO UPDATE SET"
-            " title=excluded.title, description=excluded.description, authors=excluded.authors,"
-            " environments=excluded.environments, start_level=excluded.start_level,"
-            " end_level=excluded.end_level, creatures=excluded.creatures,"
-            " downloaded_from=excluded.downloaded_from, other_args=excluded.other_args"
-
         )
 
+        if overwrite:
+            sql +=  (
+                " ON CONFLICT(slug) DO UPDATE SET"
+                " title=excluded.title, description=excluded.description, authors=excluded.authors,"
+                " environments=excluded.environments, start_level=excluded.start_level,"
+                " end_level=excluded.end_level, creatures=excluded.creatures,"
+                " downloaded_from=excluded.downloaded_from, other_args=excluded.other_args"
+            )
+        else:
+            sql += " ON CONFLICT(slug) DO NOTHING"
+
+
+        inserted = 0
+
         for adv in tqdm(adventures, desc="Storing adventures to database"):
-            authors_json = json.dumps(adv.authors or [])
-            env_json = json.dumps(adv.environments or [])
-            creatures_json = json.dumps(adv.creatures or [])
-            other_json = json.dumps(adv.other_args or {})
             cur.execute(
                 sql,
                 (
                     adv.slug,
                     adv.title,
                     adv.description,
-                    authors_json,
-                    env_json,
+                    json.dumps(adv.authors or []),
+                    json.dumps(adv.environments or []),
                     adv.start_level,
                     adv.end_level,
-                    creatures_json,
+                    json.dumps(adv.creatures or []),
                     adv.downloaded_from,
-                    other_json,
+                    json.dumps(adv.other_args or {}),
                 ),
             )
 
+            if cur.rowcount != 0:
+                inserted += 1
+
         conn.commit()
+        return inserted
     finally:
         conn.close()
 

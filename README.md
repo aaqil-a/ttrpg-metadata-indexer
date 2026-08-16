@@ -38,7 +38,7 @@ See [downloaders](src/indexer/downloader) for implementation.
 Ingests adventures from data sources into sqlite database. Overwrites database file if already exists.
 ```bash
 uv run ingest
-uv run ingest --db /path/to/sqlite/db
+uv run ingest --help
 ```
 
 #### 1a. Infer

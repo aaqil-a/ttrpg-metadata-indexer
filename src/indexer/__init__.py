@@ -3,6 +3,8 @@ import argparse
 import os
 from pathlib import Path
 from typing import List
+
+from tqdm import tqdm
 from indexer.db import get_all_adventures, store_adventures
 from indexer.downloader.adventure_lookup import AdventureLookupDownloader
 from indexer.downloader.base import Downloader
@@ -15,19 +17,27 @@ DB_PATH = Path(__file__).resolve().parents[2] / "adventures.db"
 MODEL_PATH = Path(__file__).resolve().parents[2] / "model.joblib"
 INDEX_DIR = Path(__file__).resolve().parents[2] / "index"
 
-def ingest_adventures(db_path: Path):
-    if db_path.is_file():
-        os.remove(db_path)
+SOURCE_DOWNLOADER_MAP = {
+    "adventurelookup": AdventureLookupDownloader(),
+    "5etools": Tools5eDownloader(),
+}
 
-    downloaders: List[Downloader] = [
-        AdventureLookupDownloader(),
-        Tools5eDownloader()
-    ]
+def ingest_adventures(db_path: Path, sources: List[str] = [], overwrite: bool = False):
+    downloaders: List[Downloader] = []
+    if sources:
+        for source in sources:
+            if source in SOURCE_DOWNLOADER_MAP:
+                downloaders.append(SOURCE_DOWNLOADER_MAP[source])
+            else:
+                print(f"Data source {source} not supported.")
+    else:
+        downloaders = list(SOURCE_DOWNLOADER_MAP.values())
 
     for downloader in downloaders:
         adventures = downloader.fetch_adventures()
-        store_adventures(adventures, db_path)
-        print(f"Ingested {len(adventures)} adventures from {downloader.__class__.__name__} into {db_path}.")
+        ingested = store_adventures(adventures, db_path, overwrite)
+
+        print(f"Ingested {ingested} new adventures from {downloader.__class__.__name__} into {db_path}.")
 
 
 def infer_labels(db_path: Path, model_path: Path):
@@ -74,9 +84,13 @@ def main() -> None:
 
 def ingest_cli() -> None:
     parser = argparse.ArgumentParser(prog="ingest")
+    parser.add_argument("--sources", nargs="+", choices=list(SOURCE_DOWNLOADER_MAP.keys()), default=[], 
+        help="Data sources to fetch from, leave empty to use all.")
     parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to write (will be overwritten if exists)")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing entries (default: disabled)")
+
     args = parser.parse_args()
-    ingest_adventures(args.db)
+    ingest_adventures(args.db, args.sources, args.overwrite)
 
 
 def infer_cli() -> None:
