@@ -18,11 +18,11 @@ DB_PATH = ROOT_PATH / "build" / "adventures.db"
 MODEL_PATH = ROOT_PATH / "build" / "model.joblib"
 INDEX_DIR = ROOT_PATH / "index"
 
-DATA_SOURCE_CONFIG_PATH = ROOT_PATH / "config" / "data_sources.yaml"
+CONFIG_PATH = ROOT_PATH / "config" / "config.yaml"
 
 SOURCE_DOWNLOADER_MAP = {
-    "adventurelookup": AdventureLookupDownloader(config_path=DATA_SOURCE_CONFIG_PATH),
-    "5etools": Tools5eDownloader(config_path=DATA_SOURCE_CONFIG_PATH),
+    "adventurelookup": AdventureLookupDownloader(config_path=CONFIG_PATH),
+    "5etools": Tools5eDownloader(config_path=CONFIG_PATH),
 }
 
 def ingest_adventures(db_path: Path, sources: List[str] = [], overwrite: bool = False):
