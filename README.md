@@ -48,20 +48,33 @@ ingest --help
 ```
 
 #### 1a. Infer
-Optional step to infer missing labels based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Currently used to infer `environments` for adventures missing the label.
+Optional step to infer missing labels. Currently used to infer `environments` for adventures missing the label.
 ```bash
 infer
+infer --inferrer [tfidf|llm]
 infer --help
+```
 
+**TFIDF Inference**
+
+Creates model using data with existing fields.
+```bash
 # Only train
 tfidf train
 tfidf train --eval-split 0.2 # Evaluate model
-tfidf train --help
 
 # Only infer
 tfidf infer
 tfidf infer --no-update --output /path/to/result/json # Dry run
-tfidf infer --help
+```
+
+**LLM Inference**
+
+Calls OpenAI-compatible endpoint for classification using existing data as reference. See [config.yaml](config/config.yaml) and [.env.example](.env.example) (copy to .env).
+```bash
+llm infer
+llm infer --no-update --output /path/to/result/json # Dry run
+llm estimate # Estimate token usage
 ```
 
 ### 2. Index

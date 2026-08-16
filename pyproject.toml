@@ -13,6 +13,7 @@ dependencies = [
     "joblib>=1.3.2",
     "numpy>=1.26.0",
     "pyyaml>=6.0.2",
+    "tiktoken>=0.13.0",
 ]
 
 [project.scripts]
@@ -20,6 +21,7 @@ ingest = "indexer:ingest_cli"
 infer = "indexer:infer_cli"
 index = "indexer:index_cli"
 tfidf = "indexer:tfidf_cli"
+llm = "indexer:llm_cli"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]

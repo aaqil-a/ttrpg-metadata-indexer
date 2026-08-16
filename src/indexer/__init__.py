@@ -43,7 +43,12 @@ def ingest_adventures(db_path: Path, sources: List[str] = [], overwrite: bool = 
         print(f"Ingested {ingested} new adventures from {downloader.__class__.__name__} into {db_path}.")
 
 
-def infer_labels(db_path: Path, model_path: Path, skip_training: bool):
+def infer_labels(db_path: Path, model_path: Path, skip_training: bool, inferrer: str = "tfidf"):
+    if inferrer == "llm":
+        from indexer.inference.llm import infer as llm_infer
+        llm_infer(db_path, update_db=True, config_path=CONFIG_PATH)
+        return
+
     if not skip_training:
         train(db_path, model_path)
 
@@ -68,11 +73,21 @@ def ingest_cli() -> None:
 
 def infer_cli() -> None:
     parser = argparse.ArgumentParser(prog="infer")
+    parser.add_argument("--inferrer", choices=["tfidf", "llm"], default="tfidf",
+        help="Which inferrer to use (default: tfidf). 'llm' calls an OpenAI-compatible model configured under 'inference' in config.yaml.")
     parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read/write inferred labels")
-    parser.add_argument("--model", type=Path, default=MODEL_PATH, help="Path to save/load the trained inference model")
-    parser.add_argument("--skip-training", action="store_true", help="Skip training, model must already exist at given path")
+    parser.add_argument("--model", type=Path, default=MODEL_PATH, help="Path to save/load the trained inference model (tfidf only)")
+    parser.add_argument("--skip-training", action="store_true", help="Skip training, model must already exist at given path (tfidf only)")
     args = parser.parse_args()
-    infer_labels(args.db, args.model, args.skip_training)
+
+    if args.estimate:
+        if args.inferrer != "llm":
+            parser.error("--estimate is only supported with --inferrer llm")
+        from indexer.inference.llm import print_token_estimate
+        print_token_estimate(args.db, CONFIG_PATH)
+        return
+
+    infer_labels(args.db, args.model, args.skip_training, args.inferrer)
 
 
 def index_cli() -> None:
@@ -93,4 +108,9 @@ def index_cli() -> None:
 
 def tfidf_cli() -> None:
     tfidf_module._cli()
+
+
+def llm_cli() -> None:
+    from indexer.inference import llm as llm_module
+    llm_module._cli()
 
