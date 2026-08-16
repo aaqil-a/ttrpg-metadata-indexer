@@ -1,5 +1,6 @@
 import argparse
 
+from dataclasses import fields
 from pathlib import Path
 from typing import List
 
@@ -10,6 +11,7 @@ from indexer.downloader.tools5e import Tools5eDownloader
 from indexer.index import create_adventure_files
 import indexer.tfidf as tfidf_module
 from indexer.tfidf import infer, train
+from indexer.types import Adventure
 
 ROOT_PATH = Path(__file__).resolve().parents[2]
 DB_PATH = ROOT_PATH / "build" / "adventures.db"
@@ -104,7 +106,10 @@ def infer_cli() -> None:
 
 def index_cli() -> None:
     parser = argparse.ArgumentParser(prog="index")
-    parser.add_argument("--on", nargs="+", default=["environments", "downloaded_from"])
+
+    index_fields = [f.name for f in fields(Adventure) if not f.metadata.get("no_index")]
+
+    parser.add_argument("--on", nargs="+", choices=index_fields, default=["environments", "downloaded_from"])
     parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to the sqlite database to read adventures from")
     parser.add_argument("--dir", type=Path, default=INDEX_DIR, help="Directory to write generated index files into")
     parser.add_argument("--max-entries", type=int, default=50,
