@@ -29,7 +29,7 @@ def create_adventure_files(
             encoding="utf-8",
         )
 
-    index_files = {}
+    index_files: Dict[str, Path] = {}
 
     for index in indices:
         if not hasattr(adventures[0], index):
@@ -40,7 +40,7 @@ def create_adventure_files(
             print(f"Indexing on other_args is not supported.")
             continue
 
-        index_files[index] = create_indexes(
+        index_files[index] = create_indices(
             adventures,
             root,
             index,
@@ -54,9 +54,30 @@ def create_adventure_files(
 
 
 def create_master_index(
-    index_files: Dict[str, Set[Path]],
+    submaster_files: Dict[str, Path],
     root: Path,
-) -> None:
+    file_name: str = "master.md",
+    title: str = "Master Index"
+) -> Path:
+    body: List[str] = []
+    body.append(f"# {title}")
+    for name, path in submaster_files.items():
+        body.append(f"### [By {name}]({_get_rel_path(root, path)})")
+
+    body.append("")
+
+    file_path = root / file_name
+    with open(file_path, "w", encoding="utf-8") as file:
+        file.write("\n".join(body))
+
+    return file_path
+
+def create_submaster_index(
+    index_files: Set[Path],
+    root: Path,
+    file_name: str,
+    title: str,
+) -> Path:
     lines: List[str] = []
 
     def build_tree(paths: Set[Path], base_dir: Path):
@@ -137,37 +158,35 @@ def create_master_index(
         for child_name in sorted(node['children'].keys(), key=lambda s: s.lower()):
             render_node(node['children'][child_name], indent, out_lines, child_name)
 
-    for index, paths in index_files.items():
-        if not paths:
-            continue
+    lines.append(f"# {title}")
+    lines.append("")
 
-        lines.append(f"## By {index}")
-        lines.append("")
-
-        base_dir = root / index
-        tree = build_tree(paths, base_dir)
-        render_node(tree, 0, lines)
-        lines.append("")
+    tree = build_tree(index_files, root / "indices")
+    render_node(tree, 0, lines)
 
     body = "\n".join(lines)
 
-    with open(root / "index.md", "w", encoding="utf-8") as file:
+    file_path = root / file_name
+    with open(file_path, "w", encoding="utf-8") as file:
         file.write(body)
 
-def create_indexes(
+    return file_path
+
+
+def create_indices(
     adventures: List[Adventure],
     root: Path,
     directory_name: str,
     group_by,
     max_entries: int = 50,
     hierarchical: bool = True,
-) -> Set[Path]:
+) -> Path:
     adventure_dir = root / "adventures"
 
-    index_dir = root / directory_name
+    index_dir = root / directory_name / "indices"
     index_dir.mkdir(parents=True, exist_ok=True)
 
-    index_files = set()
+    index_files: Set[Path] = set()
     groups: dict[str, list[Adventure]] = defaultdict(list)
 
     for adventure in adventures:
@@ -271,14 +290,12 @@ def create_indexes(
 
             for adventure in chunk:
                 adventure_file = adventure_dir / f"{adventure.slug}.md"
-                rel_path = os.path.relpath(adventure_file, start=target_dir)
-                rel_posix = rel_path.replace(os.path.sep, '/')
 
                 start_level = adventure.start_level or "—"
                 end_level = adventure.end_level or "—"
 
                 lines.append(
-                    f"| [{adventure.title}]({quote(rel_posix)}) "
+                    f"| [{adventure.title}]({_get_rel_path(target_dir, adventure_file)}) "
                     f"| {start_level} "
                     f"| {end_level} "
                     f"| {', '.join(adventure.environments)} |"
@@ -291,7 +308,14 @@ def create_indexes(
 
             index_files.add(index_path)
 
-    return index_files
+    index_master = create_submaster_index(
+        index_files,
+        root / directory_name, 
+        f"{directory_name}_index.md",
+        directory_name
+    )
+
+    return index_master
 
 def adventure_to_markdown(adv: Adventure) -> str:
     def esc(s: str) -> str:
@@ -356,3 +380,9 @@ def adventure_to_markdown(adv: Adventure) -> str:
     body.append("```")
 
     return "\n".join(front + [""] + body) + "\n"
+
+
+def _get_rel_path(root: Path, file: Path) -> str:
+    rel_path = os.path.relpath(file, start=root)
+    rel_posix = rel_path.replace(os.path.sep, '/')
+    return quote(rel_posix)
