@@ -34,33 +34,39 @@ See [downloaders](src/indexer/downloader) for implementation.
 - Optionally [sqlite3](https://sqlite.org/), to inspect ingested data
 
 ## Usage
-### 1. Ingest Data
-Ingests adventures from data sources into sqlite database. Overwrites database file if already exists.
+
+### 0. Setup Project
 ```bash
-uv run ingest
-uv run ingest --help
+uv sync
+```
+
+### 1. Ingest Data
+Ingests adventures from data sources into a sqlite database. 
+```bash
+ingest
+ingest --help
 ```
 
 #### 1a. Infer
 Optional step to infer missing labels based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Currently used to infer `environments` for adventures sourced from 5etools.
 ```bash
-uv run infer
-uv run infer --help
+infer
+infer --help
 
 # Only train
-uv run tfidf train
-uv run tfidf train --help
+tfidf train
+tfidf train --help
 
 # Only infer
-uv run tfidf infer
-uv run tfidf infer --no-update --output /path/to/save/inference/result/json
-uv run tfidf infer --help
+tfidf infer
+tfidf infer --no-update --output /path/to/result/json # Dry run
+tfidf infer --help
 ```
 
 ### 2. Index
 Create index Markdown files based on metadata fields. See [types.py](src/indexer/types.py) for currently supported fields (to be extended).
 ```bash
-uv run index
-uv run index --on environments start_level
-uv run index --help
+index
+index --on environments start_level
+index --help
 ```
