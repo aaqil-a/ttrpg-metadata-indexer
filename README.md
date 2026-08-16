@@ -55,6 +55,7 @@ infer --help
 
 # Only train
 tfidf train
+tfidf train --eval-split 0.2 # Evaluate model
 tfidf train --help
 
 # Only infer
@@ -64,7 +65,7 @@ tfidf infer --help
 ```
 
 ### 2. Index
-Create index Markdown files based on metadata fields. See [types.py](src/indexer/types.py) for currently supported fields (to be extended).
+Create index Markdown files based on metadata fields as declared in [types.py](src/indexer/types.py) (to be extended).
 ```bash
 index
 index --on environments start_level
