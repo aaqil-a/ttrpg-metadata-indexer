@@ -48,7 +48,7 @@ ingest --help
 ```
 
 #### 1a. Infer
-Optional step to infer missing labels based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Currently used to infer `environments` for adventures sourced from 5etools.
+Optional step to infer missing labels based on existing data using simple [TFIDF logistic regression](src/indexer/tfidf.py). Currently used to infer `environments` for adventures missing the label.
 ```bash
 infer
 infer --help
