@@ -1,6 +1,6 @@
 import re
 import os
-from collections import defaultdict
+from collections import defaultdict, Counter
 from pathlib import Path
 from typing import Dict, List, Set
 from tqdm import tqdm
@@ -9,6 +9,30 @@ from urllib.parse import quote
 
 def safe_index_name(name: str) -> str:
     return re.sub(r'[<>:"/\\|?*]', '-', name)
+
+
+def _level_range_label(chunk: List[Adventure]) -> str:
+    def fmt(a: Adventure) -> str:
+        return str(a.start_level) if a.start_level is not None else "—"
+
+    lo = fmt(chunk[0])
+    hi = fmt(chunk[-1])
+    
+    return f"Start level {lo if lo == hi else f"{lo} - {hi}"}"
+
+
+def _title_range_label(chunk: List[Adventure]) -> str:
+    def initial(a: Adventure) -> str:
+        title = (a.title or "").strip()
+        return title[0].upper() if title else "#"
+
+    lo = initial(chunk[0])
+    hi = initial(chunk[-1])
+    return lo if lo == hi else f"{lo} - {hi}"
+
+
+def chunk_range_label(chunk: List[Adventure], vary_by_level: bool) -> str:
+    return _level_range_label(chunk) if vary_by_level else _title_range_label(chunk)
 
 
 def create_adventure_files(
@@ -84,8 +108,12 @@ def create_submaster_index(
     path: Path,
     title: str,
     master_index_path: Path | None = None,
+    chunk_labels: Dict[Path, str] | None = None,
+    display_names: Dict[Path, str] | None = None,
 ) -> Path:
     lines: List[str] = []
+    chunk_labels = chunk_labels or {}
+    display_names = display_names or {}
 
     def build_tree(paths: Set[Path], base_dir: Path):
         root_node = {'children': {}, 'files': []}
@@ -141,25 +169,34 @@ def create_submaster_index(
                 key.append(iv if iv is not None else p.lower())
             return tuple(key)
 
+        def fallback_display(mem: dict) -> str:
+            if try_int(base) is not None:
+                return base
+            return mem['stem'].replace('-', ' ')
+
         for base in sorted(groups.keys(), key=base_sort_key):
             members = groups[base]
             if len(members) > 1:
-                umbrella_display = base if try_int(base) is not None else base.replace('-', ' ')
+                umbrella_display = display_names.get(
+                    members[0]['path'],
+                    base if try_int(base) is not None else base.replace('-', ' '),
+                )
                 out_lines.append(f"{prefix}- {umbrella_display}")
                 for mem in sorted(members, key=member_sort_key):
                     mm = re.match(r"^(.*?)(?:-(\d+))?$", mem['stem'])
                     suffix = mm.group(2) if mm else None
-                    if try_int(base) is not None and suffix is not None:
-                        display = f"{base} (part {int(suffix)})"
+                    label = chunk_labels.get(mem['path'])
+                    base_display = display_names.get(mem['path'], fallback_display(mem))
+                    if label:
+                        display = f"{base_display} ({label})"
+                    elif try_int(base) is not None and suffix is not None:
+                        display = f"{base_display} (part {int(suffix)})"
                     else:
-                        display = mem['stem'].replace('-', ' ')
+                        display = base_display
                     out_lines.append(f"{prefix}  - [{display}]({mem['rel']})")
             else:
                 mem = members[0]
-                if try_int(base) is not None:
-                    display = base
-                else:
-                    display = mem['stem'].replace('-', ' ')
+                display = display_names.get(mem['path'], fallback_display(mem))
                 out_lines.append(f"{prefix}- [{display}]({mem['rel']})")
 
         for child_name in sorted(node['children'].keys(), key=lambda s: s.lower()):
@@ -197,6 +234,9 @@ def create_indices(
     index_dir.mkdir(parents=True, exist_ok=True)
 
     index_files: Set[Path] = set()
+    chunk_labels: Dict[Path, str] = {}
+    display_names: Dict[Path, str] = {}
+    original_names: Dict[str, str] = {}
     groups: dict[str, list[Adventure]] = defaultdict(list)
 
     submaster_path = root / directory_name / f"{directory_name}_index.md"
@@ -213,7 +253,9 @@ def create_indices(
             if group is None:
                 group = "Other"
 
-            groups[str(group).lower()].append(adventure)
+            key = str(group).lower()
+            groups[key].append(adventure)
+            original_names.setdefault(key, str(group))
 
     def build_trie(keys: List[str]):
         root = {'children': {}, 'groups': [], 'count': 0}
@@ -273,13 +315,22 @@ def create_indices(
             ),
         )
 
-        if max_entries is None or max_entries <= 0:
-            chunks = [sorted_adventures]
-        else:
-            chunks = [
-                sorted_adventures[i : i + max_entries]
-                for i in range(0, len(sorted_adventures), max_entries)
+        def split_into_chunks(items: List[Adventure]) -> List[List[Adventure]]:
+            if not items:
+                return []
+            if max_entries is None or max_entries <= 0:
+                return [items]
+            return [
+                items[i : i + max_entries]
+                for i in range(0, len(items), max_entries)
             ]
+
+        leveled = [a for a in sorted_adventures if a.start_level is not None]
+        unleveled = [a for a in sorted_adventures if a.start_level is None]
+        chunks = split_into_chunks(leveled) + split_into_chunks(unleveled)
+
+        vary_by_level = len({a.start_level for a in sorted_adventures}) > 1
+        group_chunks: List[tuple[Path, List[Adventure]]] = []
 
         for idx, chunk in enumerate(chunks, start=1):
             suffix = f"-{idx}" if len(chunks) > 1 else ""
@@ -289,16 +340,17 @@ def create_indices(
 
             index_path = target_dir / f"{safe_name}{suffix}.md"
 
-            title = f"{group}"
+            display_name = original_names.get(group, group)
+            title = f"{display_name}"
             if len(chunks) > 1:
-                title = f"{group} ({idx}/{len(chunks)})"
+                title = f"{display_name} ({idx}/{len(chunks)})"
 
             lines = [
                 f"# {title}",
                 "",
                 f"[Back to {submaster_path.stem}]({_get_rel_path(target_dir, submaster_path)})",
-                "| Adventure | Start Level | End Level | Environments |",
-                "|---|---:|---:|---|",
+                "| Adventure | Start Level | End Level | Environments | Downloaded From |",
+                "|---|---:|---:|---|---|",
             ]
 
             for adventure in chunk:
@@ -311,7 +363,8 @@ def create_indices(
                     f"| [{adventure.title}]({_get_rel_path(target_dir, adventure_file)}) "
                     f"| {start_level} "
                     f"| {end_level} "
-                    f"| {', '.join(adventure.environments)} |"
+                    f"| {', '.join(adventure.environments)} "
+                    f"| {adventure.downloaded_from} |"
                 )
 
             index_path.write_text(
@@ -320,13 +373,26 @@ def create_indices(
             )
 
             index_files.add(index_path)
+            display_names[index_path] = display_name
+            if len(chunks) > 1:
+                group_chunks.append((index_path, chunk))
+
+        primary = {p: chunk_range_label(c, vary_by_level) for p, c in group_chunks}
+        duplicated = {lbl for lbl, n in Counter(primary.values()).items() if n > 1}
+        for path, chunk in group_chunks:
+            label = primary[path]
+            if vary_by_level and label in duplicated:
+                label = f"{label} ({_title_range_label(chunk)})"
+            chunk_labels[path] = label
 
     index_master = create_submaster_index(
         index_files,
-        root / directory_name, 
+        root / directory_name,
         submaster_path,
         directory_name,
-        master_index_path=master_index_path
+        master_index_path=master_index_path,
+        chunk_labels=chunk_labels,
+        display_names=display_names,
     )
 
     return index_master
