@@ -20,12 +20,13 @@ def create_adventure_files(
 ) -> None:
     adventure_dir = root / "adventures"
     adventure_dir.mkdir(parents=True, exist_ok=True)
+    master_index_path: Path = root / "master.md"
 
     for adventure in tqdm(adventures, desc="Writing adventures to markdown"):
         path = adventure_dir / f"{adventure.slug}.md"
 
         path.write_text(
-            adventure_to_markdown(adventure),
+            adventure_to_markdown(adventure, adventure_dir, master_index_path),
             encoding="utf-8",
         )
 
@@ -47,16 +48,17 @@ def create_adventure_files(
             lambda a: getattr(a, index),
             max_entries=max_entries,
             hierarchical=hierarchical,
+            master_index_path=master_index_path,
         )
 
     if indices:
-        create_master_index(index_files, root)
+        create_master_index(index_files, root, master_index_path)
 
 
 def create_master_index(
     submaster_files: Dict[str, Path],
     root: Path,
-    file_name: str = "master.md",
+    file_name: str | Path = "master.md",
     title: str = "Master Index"
 ) -> Path:
     body: List[str] = []
@@ -66,7 +68,11 @@ def create_master_index(
 
     body.append("")
 
-    file_path = root / file_name
+    if isinstance(file_name, Path):
+        file_path = file_name
+    else:
+        file_path = root / file_name
+
     with open(file_path, "w", encoding="utf-8") as file:
         file.write("\n".join(body))
 
@@ -75,8 +81,9 @@ def create_master_index(
 def create_submaster_index(
     index_files: Set[Path],
     root: Path,
-    file_name: str,
+    path: Path,
     title: str,
+    master_index_path: Path | None = None,
 ) -> Path:
     lines: List[str] = []
 
@@ -161,16 +168,18 @@ def create_submaster_index(
     lines.append(f"# {title}")
     lines.append("")
 
+    if master_index_path:
+        lines.append(f"[Back to {master_index_path.stem}]({_get_rel_path(root, master_index_path)})")
+
     tree = build_tree(index_files, root / "indices")
     render_node(tree, 0, lines)
 
     body = "\n".join(lines)
 
-    file_path = root / file_name
-    with open(file_path, "w", encoding="utf-8") as file:
+    with open(path, "w", encoding="utf-8") as file:
         file.write(body)
 
-    return file_path
+    return path
 
 
 def create_indices(
@@ -180,6 +189,7 @@ def create_indices(
     group_by,
     max_entries: int = 50,
     hierarchical: bool = True,
+    master_index_path: Path | None = None
 ) -> Path:
     adventure_dir = root / "adventures"
 
@@ -188,6 +198,8 @@ def create_indices(
 
     index_files: Set[Path] = set()
     groups: dict[str, list[Adventure]] = defaultdict(list)
+
+    submaster_path = root / directory_name / f"{directory_name}_index.md"
 
     for adventure in adventures:
         value = group_by(adventure)
@@ -284,6 +296,7 @@ def create_indices(
             lines = [
                 f"# {title}",
                 "",
+                f"[Back to {submaster_path.stem}]({_get_rel_path(target_dir, submaster_path)})",
                 "| Adventure | Start Level | End Level | Environments |",
                 "|---|---:|---:|---|",
             ]
@@ -311,13 +324,18 @@ def create_indices(
     index_master = create_submaster_index(
         index_files,
         root / directory_name, 
-        f"{directory_name}_index.md",
-        directory_name
+        submaster_path,
+        directory_name,
+        master_index_path=master_index_path
     )
 
     return index_master
 
-def adventure_to_markdown(adv: Adventure) -> str:
+def adventure_to_markdown(
+    adv: Adventure,
+    root: Path | None = None,
+    master_index_path: Path | None = None,
+) -> str:
     def esc(s: str) -> str:
         if s is None:
             return ""
@@ -355,6 +373,9 @@ def adventure_to_markdown(adv: Adventure) -> str:
 
     body: List[str] = []
     body.append(f"# {adv.title}")
+    body.append("")
+    if root and master_index_path:
+        body.append(f"[Back to {master_index_path.stem}]({_get_rel_path(root, master_index_path)})")
 
     if adv.environments:
         body.append("")
