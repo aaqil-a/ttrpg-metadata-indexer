@@ -3,18 +3,22 @@ from typing import Any, Dict, List, Tuple
 import math
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from tqdm import tqdm
+from indexer.config import load_data_sources
 from indexer.downloader.base import Downloader
 from indexer.types import Adventure
 import logging
 
-BASE_URL = "https://www.adventurelookup.com/api"
-SEED = 42
-
 class AdventureLookupDownloader(Downloader):
-    def __init__(self, base_url: str = BASE_URL, seed: int = SEED):
-        self.base_url = base_url
-        self.seed = seed
+    def __init__(
+        self,
+        config_path: str | Path | None = None,
+    ):
+        config = load_data_sources(config_path)
+        source_config = config.get("adventurelookup", {})
+        self.base_url = source_config.get("base_url", "")
+        self.seed = source_config.get("seed", 0)
 
 
     def _fetch_total_and_page_size(self) -> Tuple[int, int]:

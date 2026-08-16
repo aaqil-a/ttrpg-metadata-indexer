@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS adventures (
 """
 
 
-def init_db(db_path: str) -> None:
+def init_db(db_path: Path) -> None:
     db_file = Path(db_path)
     db_file.parent.mkdir(parents=True, exist_ok=True) if db_file.parent != Path('.') else None
     conn = sqlite3.connect(db_path)
@@ -35,7 +35,7 @@ def init_db(db_path: str) -> None:
         conn.close()
 
 
-def store_adventures(adventures: List[Adventure], db_path: str, overwrite: bool) -> int:
+def store_adventures(adventures: List[Adventure], db_path: Path, overwrite: bool) -> int:
     init_db(db_path)
     conn = sqlite3.connect(db_path)
     try:
@@ -86,7 +86,7 @@ def store_adventures(adventures: List[Adventure], db_path: str, overwrite: bool)
         conn.close()
 
 
-def get_all_adventures(db_path: str) -> List[Adventure]:
+def get_all_adventures(db_path: Path) -> List[Adventure]:
     init_db(db_path)
     conn = sqlite3.connect(db_path)
     try:

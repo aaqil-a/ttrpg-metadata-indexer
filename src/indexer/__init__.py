@@ -1,10 +1,8 @@
 import argparse
 
-import os
 from pathlib import Path
 from typing import List
 
-from tqdm import tqdm
 from indexer.db import get_all_adventures, store_adventures
 from indexer.downloader.adventure_lookup import AdventureLookupDownloader
 from indexer.downloader.base import Downloader
@@ -13,13 +11,16 @@ from indexer.index import create_adventure_files
 import indexer.tfidf as tfidf_module
 from indexer.tfidf import infer, train
 
-DB_PATH = Path(__file__).resolve().parents[2] / "adventures.db"
-MODEL_PATH = Path(__file__).resolve().parents[2] / "model.joblib"
-INDEX_DIR = Path(__file__).resolve().parents[2] / "index"
+ROOT_PATH = Path(__file__).resolve().parents[2]
+DB_PATH = ROOT_PATH / "build" / "adventures.db"
+MODEL_PATH = ROOT_PATH / "build" / "model.joblib"
+INDEX_DIR = ROOT_PATH / "index"
+
+DATA_SOURCE_CONFIG_PATH = ROOT_PATH / "config" / "data_sources.yaml"
 
 SOURCE_DOWNLOADER_MAP = {
-    "adventurelookup": AdventureLookupDownloader(),
-    "5etools": Tools5eDownloader(),
+    "adventurelookup": AdventureLookupDownloader(config_path=DATA_SOURCE_CONFIG_PATH),
+    "5etools": Tools5eDownloader(config_path=DATA_SOURCE_CONFIG_PATH),
 }
 
 def ingest_adventures(db_path: Path, sources: List[str] = [], overwrite: bool = False):

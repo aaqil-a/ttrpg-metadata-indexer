@@ -1,26 +1,21 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any, Dict, List
 from collections import Counter
 import re
 
 from tqdm import tqdm
+from indexer.config import load_data_sources
 from indexer.downloader.base import Downloader
 from indexer.types import Adventure
 
-BASE_URL = "https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/refs/heads/main/data"
-
-DESCRIPTION_TYPES = {
-    "section",
-    "entries",
-    "inset",
-    "insetReadaloud",
-    "quote",
-}
 
 class Tools5eDownloader(Downloader):
-    def __init__(self, base_url: str = BASE_URL):
-        self.base_url = base_url
-
+    def __init__(self, config_path: str | Path | None = None):
+        config = load_data_sources(config_path)
+        source_config = config.get("5etools", {})
+        self.base_url = source_config.get("base_url", "")
+        self.description_types = source_config.get("description_types", [])
 
     def _get_slug(self, title: str) -> str:
         return title.replace(" ", "-").lower()
@@ -69,7 +64,7 @@ class Tools5eDownloader(Downloader):
 
             entry_type = node.get("type")
 
-            if entry_type not in DESCRIPTION_TYPES:
+            if entry_type not in self.description_types:
                 return True
 
             entries = node.get("entries")
